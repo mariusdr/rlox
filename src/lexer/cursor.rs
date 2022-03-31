@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::str::Chars;
 
 /// Cursor encapsulates all the character level operations on the source code.

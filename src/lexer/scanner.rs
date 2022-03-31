@@ -1,7 +1,3 @@
-use std::iter::Peekable;
-use std::str::Chars;
-use std::string::ToString;
-
 use super::cursor::Cursor;
 use super::token::{Token, TokenType};
 
