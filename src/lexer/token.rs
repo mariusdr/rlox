@@ -47,6 +47,11 @@ impl Token {
         self.token_type
     }
 
+    /// Return true if the token has the given type.
+    pub fn match_type(&self, ttype: TokenType) -> bool {
+        self.get_type() == ttype
+    }
+
     /// True if this token has a lexeme, false otherwise.
     pub fn has_lexeme(&self) -> bool {
         self.lexeme.is_some()

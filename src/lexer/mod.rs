@@ -1,5 +1,6 @@
 mod cursor;
-pub mod scanner;
+mod scanner;
+
 pub mod token;
 use scanner::Scanner;
 use token::{Token, TokenType};
