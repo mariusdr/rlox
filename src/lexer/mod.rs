@@ -18,6 +18,10 @@ impl<'a> TokenStream<'a> {
     pub fn new(src: &'a str) -> Self {
         TokenStream {scanr: Scanner::new(src), eof_reached: false}
     }
+
+    pub fn at_eof(&self) -> bool {
+        self.eof_reached
+    }
 }
 
 impl<'a> Iterator for TokenStream<'a> {
@@ -26,7 +30,7 @@ impl<'a> Iterator for TokenStream<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         // scanner keeps returning EOF, track that here and 
         // end the iterator when EOF was returned once
-        if self.eof_reached {
+        if self.at_eof() {
             return None;
         }
         

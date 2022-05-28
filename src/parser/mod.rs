@@ -1,7 +1,7 @@
 pub mod ast;
 use std::result::Result;
 use std::iter::Peekable;
-use std::fmt;
+use std::fmt::{Write};
 use std::f64;
 
 use ast::*;
@@ -37,7 +37,30 @@ impl<'a> Parser<'a> {
     }
 
     pub fn expression(&mut self) -> Result<Expr, ParserError> {
-        self.equality()
+        self.assignment()
+    }
+
+    #[inline]
+    fn assignment_error(&self, expr: &Expr) -> Result<Expr, ParserError> {
+        let mut buf = String::new();
+        write!(&mut buf, "An expression of type '{}' is a invalid assignment target.", expr_type(&expr));
+        Err(ParserError::new(buf))
+    }
+
+    /// assignment ::= variable '=' assignment 
+    ///            ::= equality
+    pub fn assignment(&mut self) -> Result<Expr, ParserError> {
+        let expr = self.equality()?;
+
+        if self.try_consume(TokenType::Equal) {
+            let value = self.assignment()?;
+            if let Expr::Variable(vd) = expr {
+                let name = String::from(vd.name());
+                return Ok(Expr::Assign(AssignData::new(name, Box::new(value))));
+            } 
+            return self.assignment_error(&expr);
+        }
+        Ok(expr)
     }
 
     /// equality ::= comparison ('!=' | '==') comparison | comparison
@@ -137,20 +160,147 @@ impl<'a> Parser<'a> {
         Err(ParserError::from("TokenStream ended unexpectedly while parsing primary expression."))
     }
 
-    /// Peek on the next token of the stream and consume it if it matches 
-    /// the given type.
-    fn try_consume(&mut self, ttype: TokenType) -> bool {
+    #[inline]
+    fn consume_semicolon(&mut self) -> Result<(), ParserError> {
+        if !self.try_consume(TokenType::Semicolon) {
+            return Err(ParserError::from("Missing ';' after statement."));
+        }
+        Ok(())
+    }
+
+    /// printstmt ::= 'print' expression ';'
+    fn print_statement(&mut self) -> Result<Stmt, ParserError> {
+        let value = self.expression()?;
+        self.consume_semicolon()?;
+        Ok(Stmt::Print(PrintData::new(Box::new(value))))
+    }
+
+    /// exprstmt ::= expression ';'
+    fn expr_statement(&mut self) -> Result<Stmt, ParserError> {
+        let expr = self.expression()?;
+        self.consume_semicolon()?;
+        Ok(Stmt::Expr(ExprData::new(Box::new(expr)))) 
+    }
+
+    /// statement ::= printstmt 
+    ///           ::= exrpstmt
+    ///           ::= '{' blockstmt
+    ///           ::= 'if' ifstmt
+    pub fn statement(&mut self) -> Result<Stmt, ParserError> {
+        if self.try_consume(TokenType::Print) {
+            return self.print_statement();
+        }
+        if self.try_consume(TokenType::LeftBrace) {
+            return self.block_statement();
+        }
+        if self.try_consume(TokenType::If) {
+            return self.if_statement();
+        }
+
+        self.expr_statement()
+    }
+
+    /// vardeclstmt ::= IDENTIFIER ('=' expression)? ';'
+    fn var_declaration(&mut self) -> Result<Stmt, ParserError> {
+        self.require(TokenType::Identifier, "Expected identifier in var declaration.")?;
+
+        if !self.previous.has_lexeme() {
+            return Err(ParserError::from("Var declaration with empty name."));
+        } 
+        let name = self.previous.get_lexeme();
+
+        let mut identifier: Option<Box<Expr>> = None;
+        if self.try_consume(TokenType::Equal) {
+            let expr = self.expression()?;
+            identifier = Some(Box::new(expr));
+        }
+        self.consume_semicolon()?;
+        Ok(Stmt::VarDecl(VarDeclData::new(name, identifier)))
+    }
+
+    /// declstmt ::= 'var' vardeclstmt
+    ///          ::= statement
+    pub fn declaration(&mut self) -> Result<Stmt, ParserError> {
+        if self.try_consume(TokenType::Var) {
+            return self.var_declaration();
+        }
+        // TODO: error recovery should be done here!
+        self.statement()
+    }
+
+    /// blockstmt ::= declstmt* '}'
+    pub fn block_statement(&mut self) -> Result<Stmt, ParserError> {
+        let mut stmts = Stmts::new();
+        while !self.is_done() && !self.peek_at_next_token(TokenType::RightBrace) {
+            stmts.push(self.declaration()?)
+        }
+        
+        self.require(TokenType::RightBrace, "Expected '}' after block.")?;
+        Ok(Stmt::Block(BlockData::new(stmts)))
+    }
+
+    /// ifstmt ::= '(' expression ')' statement ('else' statement)?
+    fn if_statement(&mut self) -> Result<Stmt, ParserError> {
+        self.require(TokenType::LeftParen, "Expected '(' after 'if'.")?;
+        let cond = self.expression()?;
+        self.require(TokenType::RightParen, "Expected ')' after 'if' condition.")?;
+
+        let then_br = self.statement()?;
+        let mut else_br: Option<Box<Stmt>> = None;
+        if self.try_consume(TokenType::Else) {
+            else_br = Some(Box::new(self.statement()?));
+        }        
+        Ok(Stmt::If(IfData::new(Box::new(cond), Box::new(then_br), else_br)))
+    }
+
+    pub fn parse(&mut self) -> Result<Stmts, ParserError> {
+         
+        Ok(Stmts::new())
+    }
+
+    /// Peek on the next token and return its type.
+    fn peek_at_next_tokentype(&mut self) -> Option<TokenType> {
+        if let Some(top) = self.toks.peek() {
+            return Some(top.get_type());
+        }
+        None
+    }
+
+    /// Peek on the next token and check if it has the given type.
+    fn peek_at_next_token(&mut self, ttype: TokenType) -> bool {
         if let Some(top) = self.toks.peek() {
             if top.get_type() == ttype {
-                // peeked at next already so unwrap is ok here
-                self.previous = self.toks.next().unwrap(); 
                 return true;
             }
         }
         false
     }
 
+    /// Peek on the next token of the stream and consume it if it matches 
+    /// the given type.
+    fn try_consume(&mut self, ttype: TokenType) -> bool {
+        if self.peek_at_next_token(ttype) {
+            // peeked at next already so unwrap is ok here
+            self.previous = self.toks.next().unwrap();
+            return true;
+        }
+        false
+    }
 
+    /// Try to consume the next token and fail with a parser error if that 
+    /// was not possible.
+    fn require(&mut self, ttype: TokenType, on_error: &str) -> Result<(), ParserError> {
+        if !self.try_consume(ttype) {
+            return Err(ParserError::from(on_error));
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn is_done(&mut self) -> bool {
+        self.toks.peek().is_none()
+    }
+    
 }
 
 #[cfg(test)] 
