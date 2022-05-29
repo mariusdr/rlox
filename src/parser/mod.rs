@@ -224,6 +224,9 @@ impl<'a> Parser<'a> {
         if self.try_consume(TokenType::If) {
             return self.if_statement();
         }
+        if self.try_consume(TokenType::While) {
+            return self.while_statement();
+        }
         self.expr_statement()
     }
 
@@ -277,6 +280,16 @@ impl<'a> Parser<'a> {
             else_br = Some(self.statement()?);
         }        
         Ok(make_if(cond, then_br, else_br))
+    }
+    
+    /// whilestmt ::= 'while' '(' expression ')' statement
+    fn while_statement(&mut self) -> Result<Stmt, ParserError> {
+        self.require(TokenType::LeftParen, "Expect '(' after 'while'.")?;
+        let cond = self.expression()?;
+        self.require(TokenType::RightParen, "Expect ')' after condition.")?;
+
+        let body = self.statement()?;
+        Ok(make_while(cond, body))
     }
 
     pub fn parse(&mut self) -> Result<Stmts, ParserError> {

@@ -325,5 +325,11 @@ mod parser_tests {
         assert_eq!(res[0], v);
     }
 
-
+    #[test]
+    fn while_statement() {
+        let src = "while (1 and 0) 1+2;";
+        let res = Parser::new(src).parse().unwrap();
+        let v = make_while(and_expr(), sum_stmt());
+        assert_eq!(res[0], v);
+    }
 }

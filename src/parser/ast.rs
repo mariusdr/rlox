@@ -718,11 +718,11 @@ pub fn make_vardecl(name: &str, init: Option<Expr>) -> Stmt {
 #[derive(Debug)]
 pub struct WhileData {
     condition: Box<Expr>, 
-    body: Vec<Stmt>,
+    body: Box<Stmt>,
 }
 
 impl WhileData {
-    pub fn new(cond: Box<Expr>, body: Vec<Stmt>) -> Self {
+    pub fn new(cond: Box<Expr>, body: Box<Stmt>) -> Self {
         Self {condition: cond, body: body}
     }
 
@@ -730,7 +730,7 @@ impl WhileData {
         &self.condition
     }
 
-    pub fn body(&self) -> &[Stmt] {
+    pub fn body(&self) -> &Stmt {
         &self.body
     }
 }
@@ -740,12 +740,12 @@ impl PartialEq for WhileData {
         if self.condition() != other.condition() {
             return false;
         }
-        cmp_seq(self.body(), other.body())
+        self.body() == other.body()
     }
 }
 
-pub fn make_while(cond: Expr, body: Vec<Stmt>) -> Stmt {
-    Stmt::While(WhileData::new(Box::new(cond), body))
+pub fn make_while(cond: Expr, body: Stmt) -> Stmt {
+    Stmt::While(WhileData::new(Box::new(cond), Box::new(body)))
 }
 
 #[derive(Debug, PartialEq)]
