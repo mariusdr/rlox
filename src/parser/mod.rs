@@ -85,12 +85,20 @@ impl<'a> Parser<'a> {
         Ok(lhs)
     }
 
+    /// retrieve binary op type of previous token.
+    fn binop_type(&mut self) -> Result<BinaryOpType, ParserError> {
+        if let Some(op) = BinaryOpType::extract(&self.previous) {
+            return Ok(op);
+        }
+        Err(ParserError::from("Previous token was not a binary operator."))
+    }
+
     /// equality ::= comparison ('!=' | '==') comparison | comparison
     pub fn equality(&mut self) -> Result<Expr, ParserError> {
         let mut lhs = self.comparison()?;
 
         while self.try_consume(TokenType::BangEqual) || self.try_consume(TokenType::EqualEqual) {
-            let op = BinaryOpType::extract(&self.previous).unwrap();
+            let op = self.binop_type()?;
             let rhs = self.comparison()?;
             lhs = make_binaryop(op, lhs, rhs);
         }
@@ -104,7 +112,7 @@ impl<'a> Parser<'a> {
         while self.try_consume(TokenType::Greater) || self.try_consume(TokenType::GreaterEqual) ||
               self.try_consume(TokenType::Less) || self.try_consume(TokenType::LessEqual) 
         {
-            let op = BinaryOpType::extract(&self.previous).unwrap();
+            let op = self.binop_type()?;
             let rhs = self.term()?;
             lhs = make_binaryop(op, lhs, rhs);
         }
@@ -116,7 +124,7 @@ impl<'a> Parser<'a> {
         let mut lhs = self.factor()?;
 
         while self.try_consume(TokenType::Minus) || self.try_consume(TokenType::Plus) {
-            let op = BinaryOpType::extract(&self.previous).unwrap();
+            let op = self.binop_type()?;
             let rhs = self.factor()?;
             lhs = make_binaryop(op, lhs, rhs);
         }
@@ -128,18 +136,26 @@ impl<'a> Parser<'a> {
         let mut lhs = self.unary()?;
         
         while self.try_consume(TokenType::Slash) || self.try_consume(TokenType::Star) {
-            let op = BinaryOpType::extract(&self.previous).unwrap();
+            let op = self.binop_type()?;
             let rhs = self.factor()?;
             lhs = make_binaryop(op, lhs, rhs);
         }
         Ok(lhs)
     }
 
+    /// retrieve unary op type of previous token.
+    fn unaryop_type(&mut self) -> Result<UnaryOpType, ParserError> {
+        if let Some(op) = UnaryOpType::extract(&self.previous) {
+            return Ok(op);
+        }
+        Err(ParserError::from("Previous token was not a unary operator."))
+    }
+
     /// unary ::= '-' unary | '!' unary
     ///       ::= primary
     pub fn unary(&mut self) -> Result<Expr, ParserError> {
         if self.try_consume(TokenType::Bang) | self.try_consume(TokenType::Minus) {
-            let op = UnaryOpType::extract(&self.previous).unwrap();
+            let op = self.unaryop_type()?;
             let rhs = self.unary()?;
             return Ok(make_unaryop(op, rhs));
         }
