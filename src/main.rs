@@ -81,20 +81,20 @@ fn main() -> Result<(), std::io::Error> {
     // let res = parser.statement();
     // print_result(&res);
     
-    let src = "if print zoid; else print berg;";
-    let mut parser = Parser::new(src);
-    let res = parser.statement();
-    print_result(&res);
+    // let src = "if print zoid; else print berg;";
+    // let mut parser = Parser::new(src);
+    // let res = parser.statement();
+    // print_result(&res);
     
-    let src = "if (x print zoid; else print berg;";
-    let mut parser = Parser::new(src);
-    let res = parser.statement();
-    print_result(&res);
+    // let src = "if (x print zoid; else print berg;";
+    // let mut parser = Parser::new(src);
+    // let res = parser.statement();
+    // print_result(&res);
     
-    let src = "if (x);";
-    let mut parser = Parser::new(src);
-    let res = parser.statement();
-    print_result(&res);
+    // let src = "if (x);";
+    // let mut parser = Parser::new(src);
+    // let res = parser.statement();
+    // print_result(&res);
     
     // let src = "if (x == 1) {var x = \"zoid\"; print x;} else print \"berg\";";
     // let mut parser = Parser::new(src);
@@ -118,10 +118,10 @@ fn main() -> Result<(), std::io::Error> {
 
     // ----------------------------------------------------------------------//
 
-    // let src = "(5 - (3 - 1)) + -1";
-    // let mut parser = Parser::new(src);
-    // let res = parser.expression();
-    // print_result(&res);
+    let src = "(5 - (3 - 1)) + -1";
+    let mut parser = Parser::new(src);
+    let res = parser.expression();
+    print_result(&res);
     
     // let src = "(x - (y - 1)) + -1";
     // let mut parser = Parser::new(src);

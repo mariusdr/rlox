@@ -1,4 +1,7 @@
+#![allow(dead_code)]
 pub mod ast;
+mod tests;
+
 use std::result::Result;
 use std::iter::Peekable;
 use std::fmt::{Write};
@@ -55,8 +58,7 @@ impl<'a> Parser<'a> {
         if self.try_consume(TokenType::Equal) {
             let value = self.assignment()?;
             if let Expr::Variable(vd) = expr {
-                let name = String::from(vd.name());
-                return Ok(Expr::Assign(AssignData::new(name, Box::new(value))));
+                return Ok(make_assign(vd.name(), value));
             } 
             return self.assignment_error(&expr);
         }
@@ -70,7 +72,7 @@ impl<'a> Parser<'a> {
         while self.try_consume(TokenType::BangEqual) || self.try_consume(TokenType::EqualEqual) {
             let op = BinaryOpType::extract(&self.previous).unwrap();
             let rhs = self.comparison()?;
-            lhs = Expr::BinaryOp(BinaryOpData::new(op, Box::new(lhs), Box::new(rhs)));
+            lhs = make_binaryop(op, lhs, rhs);
         }
         Ok(lhs)
     }
@@ -84,7 +86,7 @@ impl<'a> Parser<'a> {
         {
             let op = BinaryOpType::extract(&self.previous).unwrap();
             let rhs = self.term()?;
-            lhs = Expr::BinaryOp(BinaryOpData::new(op, Box::new(lhs), Box::new(rhs)));
+            lhs = make_binaryop(op, lhs, rhs);
         }
         Ok(lhs)
     }
@@ -96,7 +98,7 @@ impl<'a> Parser<'a> {
         while self.try_consume(TokenType::Minus) || self.try_consume(TokenType::Plus) {
             let op = BinaryOpType::extract(&self.previous).unwrap();
             let rhs = self.factor()?;
-            lhs = Expr::BinaryOp(BinaryOpData::new(op, Box::new(lhs), Box::new(rhs)));
+            lhs = make_binaryop(op, lhs, rhs);
         }
         Ok(lhs)
     }
@@ -108,7 +110,7 @@ impl<'a> Parser<'a> {
         while self.try_consume(TokenType::Slash) || self.try_consume(TokenType::Star) {
             let op = BinaryOpType::extract(&self.previous).unwrap();
             let rhs = self.factor()?;
-            lhs = Expr::BinaryOp(BinaryOpData::new(op, Box::new(lhs), Box::new(rhs)));
+            lhs = make_binaryop(op, lhs, rhs);
         }
         Ok(lhs)
     }
@@ -119,7 +121,7 @@ impl<'a> Parser<'a> {
         if self.try_consume(TokenType::Bang) | self.try_consume(TokenType::Minus) {
             let op = UnaryOpType::extract(&self.previous).unwrap();
             let rhs = self.unary()?;
-            return Ok(Expr::UnaryOp(UnaryOpData::new(op, Box::new(rhs))));
+            return Ok(make_unaryop(op, rhs));
         }
         self.primary()
     }
@@ -128,58 +130,48 @@ impl<'a> Parser<'a> {
     ///         ::= '(' expression ')'
     pub fn primary(&mut self) -> Result<Expr, ParserError> {
         if self.try_consume(TokenType::False) {
-            return Ok(Expr::Literal(LiteralData::false_lit()));
+            return Ok(make_false_literal());
         }
         if self.try_consume(TokenType::True) {
-            return Ok(Expr::Literal(LiteralData::true_lit()));
+            return Ok(make_true_literal());
         }
         if self.try_consume(TokenType::Nil) {
-            return Ok(Expr::Literal(LiteralData::nil_lit()));
+            return Ok(make_nil_literal());
         }
         if self.try_consume(TokenType::Number) {
-            let lit = self.previous.get_lexeme();
-            return Ok(Expr::Literal(LiteralData::num_lit(lit)));
+            let lit = &self.previous.get_lexeme();
+            return Ok(make_num_literal(lit));
         }
         if self.try_consume(TokenType::String) {
-            let lit = self.previous.get_lexeme();
-            return Ok(Expr::Literal(LiteralData::str_lit(lit)));
+            let lit = &self.previous.get_lexeme();
+            return Ok(make_str_literal(lit));
         }
         if self.try_consume(TokenType::Identifier) {
-            let lit = self.previous.get_lexeme();
-            return Ok(Expr::Variable(VariableData::new(lit)));
+            let lit = &self.previous.get_lexeme();
+            return Ok(make_variable(lit));
         }
 
         if self.try_consume(TokenType::LeftParen) {
             let expr = self.expression()?;
-            if !self.try_consume(TokenType::RightParen) {
-                return Err(ParserError::from("No matching ')' after expression."));
-            }
-            return Ok(Expr::Grouping(GroupingData::new(Box::new(expr))));
+            self.require(TokenType::RightParen, "Missing matching ')'.")?;
+            return Ok(make_grouping(expr));
         }
 
         Err(ParserError::from("TokenStream ended unexpectedly while parsing primary expression."))
     }
 
-    #[inline]
-    fn consume_semicolon(&mut self) -> Result<(), ParserError> {
-        if !self.try_consume(TokenType::Semicolon) {
-            return Err(ParserError::from("Missing ';' after statement."));
-        }
-        Ok(())
-    }
-
     /// printstmt ::= 'print' expression ';'
     fn print_statement(&mut self) -> Result<Stmt, ParserError> {
         let value = self.expression()?;
-        self.consume_semicolon()?;
-        Ok(Stmt::Print(PrintData::new(Box::new(value))))
+        self.require(TokenType::Semicolon, "Missing ';' after statement")?;
+        Ok(make_print(value))
     }
 
     /// exprstmt ::= expression ';'
     fn expr_statement(&mut self) -> Result<Stmt, ParserError> {
         let expr = self.expression()?;
-        self.consume_semicolon()?;
-        Ok(Stmt::Expr(ExprData::new(Box::new(expr)))) 
+        self.require(TokenType::Semicolon, "Missing ';' after statement")?;
+        Ok(make_expr(expr))
     }
 
     /// statement ::= printstmt 
@@ -196,7 +188,6 @@ impl<'a> Parser<'a> {
         if self.try_consume(TokenType::If) {
             return self.if_statement();
         }
-
         self.expr_statement()
     }
 
@@ -207,15 +198,15 @@ impl<'a> Parser<'a> {
         if !self.previous.has_lexeme() {
             return Err(ParserError::from("Var declaration with empty name."));
         } 
-        let name = self.previous.get_lexeme();
+        let name = &self.previous.get_lexeme();
 
-        let mut identifier: Option<Box<Expr>> = None;
+        let mut initializer: Option<Expr> = None;
         if self.try_consume(TokenType::Equal) {
             let expr = self.expression()?;
-            identifier = Some(Box::new(expr));
+            initializer = Some(expr);
         }
-        self.consume_semicolon()?;
-        Ok(Stmt::VarDecl(VarDeclData::new(name, identifier)))
+        self.require(TokenType::Semicolon, "Missing ';' after statement")?;
+        Ok(make_vardecl(name, initializer))
     }
 
     /// declstmt ::= 'var' vardeclstmt
@@ -234,9 +225,8 @@ impl<'a> Parser<'a> {
         while !self.is_done() && !self.peek_at_next_token(TokenType::RightBrace) {
             stmts.push(self.declaration()?)
         }
-        
         self.require(TokenType::RightBrace, "Expected '}' after block.")?;
-        Ok(Stmt::Block(BlockData::new(stmts)))
+        Ok(make_block(stmts))
     }
 
     /// ifstmt ::= '(' expression ')' statement ('else' statement)?
@@ -246,16 +236,19 @@ impl<'a> Parser<'a> {
         self.require(TokenType::RightParen, "Expected ')' after 'if' condition.")?;
 
         let then_br = self.statement()?;
-        let mut else_br: Option<Box<Stmt>> = None;
+        let mut else_br: Option<Stmt> = None;
         if self.try_consume(TokenType::Else) {
-            else_br = Some(Box::new(self.statement()?));
+            else_br = Some(self.statement()?);
         }        
-        Ok(Stmt::If(IfData::new(Box::new(cond), Box::new(then_br), else_br)))
+        Ok(make_if(cond, then_br, else_br))
     }
 
     pub fn parse(&mut self) -> Result<Stmts, ParserError> {
-         
-        Ok(Stmts::new())
+        let mut stmts = Stmts::new();
+        while !self.is_done() {
+            stmts.push(self.declaration()?);
+        } 
+        Ok(stmts)
     }
 
     /// Peek on the next token and return its type.
@@ -298,19 +291,6 @@ impl<'a> Parser<'a> {
 
     #[inline]
     fn is_done(&mut self) -> bool {
-        self.toks.peek().is_none()
-    }
-    
-}
-
-#[cfg(test)] 
-mod tests {
-    use super::*;
-
-    #[test]
-    fn foo() {
-        let src = "(5 - (3 - 1)) + -1";
-        let mut parser = Parser::new(src);
-
+        self.peek_at_next_token(TokenType::Eof)
     }
 }

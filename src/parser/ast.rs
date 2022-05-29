@@ -1,6 +1,6 @@
+#![allow(dead_code)]
 use std::boxed::Box;
 use std::fmt;
-
 use super::super::lexer::token::{Token, TokenType};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -139,6 +139,42 @@ impl LiteralData {
     }
 }
 
+impl PartialEq for LiteralData {
+    fn eq(&self, other: &Self) -> bool {
+        (self.typ == other.typ) && (self.lexeme() == other.lexeme())
+    }
+}
+
+#[inline]
+pub fn make_literal(typ: LoxType, lex: &str) -> Expr {
+    Expr::Literal(LiteralData::new(typ, String::from(lex)))
+}
+
+#[inline]
+pub fn make_true_literal() -> Expr {
+    Expr::Literal(LiteralData::true_lit())
+}
+
+#[inline]
+pub fn make_false_literal() -> Expr {
+    Expr::Literal(LiteralData::false_lit())
+}
+
+#[inline]
+pub fn make_str_literal(lex: &str) -> Expr {
+    Expr::Literal(LiteralData::str_lit(String::from(lex)))
+}
+
+#[inline]
+pub fn make_num_literal(lex: &str) -> Expr {
+    Expr::Literal(LiteralData::num_lit(String::from(lex)))
+}
+
+#[inline]
+pub fn make_nil_literal() -> Expr {
+    Expr::Literal(LiteralData::nil_lit())
+}
+
 #[derive(Debug)]
 pub struct GroupingData {
     inner: Box<Expr>,
@@ -152,6 +188,17 @@ impl GroupingData {
     pub fn inner(&self) -> &Expr {
         &self.inner
     }
+}
+
+impl PartialEq for GroupingData {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner() == other.inner()
+    }
+}
+
+#[inline]
+pub fn make_grouping(inner: Expr) -> Expr {
+    Expr::Grouping(GroupingData::new(Box::new(inner)))
 }
 
 #[derive(Debug)]
@@ -172,6 +219,17 @@ impl UnaryOpData {
     pub fn expr(&self) -> &Expr {
         &self.expr
     }
+}
+
+impl PartialEq for UnaryOpData {
+    fn eq(&self, other: &Self) -> bool {
+        self.op_type() == other.op_type() && self.expr() == other.expr()
+    }
+}
+
+#[inline]
+pub fn make_unaryop(op: UnaryOpType, expr: Expr) -> Expr {
+    Expr::UnaryOp(UnaryOpData::new(op, Box::new(expr)))
 }
 
 #[derive(Debug)]
@@ -199,6 +257,19 @@ impl BinaryOpData {
     }
 }
 
+impl PartialEq for BinaryOpData {
+    fn eq(&self, other: &Self) -> bool {
+        self.op_type() == other.op_type() 
+        && self.lhs() == other.lhs()
+        && self.rhs() == other.rhs()
+    }
+}
+
+#[inline]
+pub fn make_binaryop(op: BinaryOpType, lhs: Expr, rhs: Expr) -> Expr {
+    Expr::BinaryOp(BinaryOpData::new(op, Box::new(lhs), Box::new(rhs)))
+}
+
 #[derive(Debug)]
 pub struct VariableData {
     name: String,
@@ -212,6 +283,17 @@ impl VariableData {
     pub fn name(&self) -> &str {
         &self.name
     }
+}
+
+impl PartialEq for VariableData {
+    fn eq(&self, other: &Self) -> bool {
+        self.name() == other.name() 
+    }
+}
+
+#[inline]
+pub fn make_variable(name: &str) -> Expr {
+    Expr::Variable(VariableData::new(String::from(name)))
 }
 
 #[derive(Debug)]
@@ -234,7 +316,19 @@ impl AssignData {
     }
 }
 
-#[derive(Debug)]
+impl PartialEq for AssignData {
+    fn eq(&self, other: &Self) -> bool {
+        self.name() == other.name() 
+        && self.expr() == other.expr()
+    }
+}
+
+#[inline]
+pub fn make_assign(name: &str, expr: Expr) -> Expr {
+    Expr::Assign(AssignData::new(String::from(name), Box::new(expr)))
+}
+
+#[derive(Debug, PartialEq)]
 pub enum Expr {
     Literal(LiteralData),
     Grouping(GroupingData),
@@ -284,6 +378,30 @@ impl BlockData {
     }
 }
 
+fn cmp_seq<T: PartialEq>(xs: &[T], ys: &[T]) -> bool {
+    if xs.len() != ys.len() {
+        return false;
+    }
+    
+    for (x, y) in xs.iter().zip(ys.iter()) {
+        if x != y {
+            return false;
+        }
+    }
+    true
+}
+
+impl PartialEq for BlockData {
+    fn eq(&self, other: &Self) -> bool {
+        cmp_seq(self.statements(), other.statements())
+    }
+}
+
+#[inline]
+pub fn make_block(stmts: Vec<Stmt>) -> Stmt {
+    Stmt::Block(BlockData::new(stmts))
+}
+
 #[derive(Debug)]
 pub struct ExprData {
     expr: Box<Expr>,
@@ -299,6 +417,17 @@ impl ExprData {
     }
 }
 
+impl PartialEq for ExprData {
+    fn eq(&self, other: &Self) -> bool {
+        self.expr() == other.expr()
+    }
+}
+
+#[inline]
+pub fn make_expr(expr: Expr) -> Stmt {
+    Stmt::Expr(ExprData::new(Box::new(expr)))
+}
+
 #[derive(Debug)]
 pub struct FunctionData {
     name: String,
@@ -307,8 +436,8 @@ pub struct FunctionData {
 }
 
 impl FunctionData {
-    pub fn new(n: String, ps: Vec<String>, body: Vec<Stmt>) -> Self {
-        Self {name: n, params: ps, body: body}
+    pub fn new(name: String, params: Vec<String>, body: Vec<Stmt>) -> Self {
+        Self {name: name, params: params, body: body}
     }
 
     pub fn name(&self) -> &str {
@@ -322,6 +451,23 @@ impl FunctionData {
     pub fn body(&self) -> &[Stmt] {
         &self.body
     }
+}
+
+impl PartialEq for FunctionData {
+    fn eq(&self, other: &Self) -> bool {
+        if self.name() != other.name() {
+            return false;
+        }
+        if !cmp_seq(self.params(), other.params()) {
+            return false;
+        }
+        cmp_seq(self.body(), other.body())
+    }
+}
+
+#[inline]
+pub fn make_function(name: &str, params: Vec<String>, body: Vec<Stmt>) -> Stmt {
+    Stmt::Function(FunctionData::new(String::from(name), params, body))
 }
 
 #[derive(Debug)]
@@ -347,6 +493,23 @@ impl ClassData {
     pub fn functions(&self) -> &[FunctionData] {
         &self.functions
     }
+}
+
+impl PartialEq for ClassData {
+    fn eq(&self, other: &Self) -> bool {
+        if self.name() != other.name() {
+            return false;
+        }
+        if self.super_class() != other.super_class() {
+            return false;
+        }
+        cmp_seq(self.functions(), other.functions())
+    }
+}
+
+#[inline]
+pub fn make_class(name: &str, supercl: VariableData, fns: Vec<FunctionData>) -> Stmt {
+    Stmt::Class(ClassData::new(String::from(name), Box::new(supercl), fns))
 }
 
 #[derive(Debug)]
@@ -377,6 +540,23 @@ impl IfData {
     }
 }
 
+impl PartialEq for IfData {
+    fn eq(&self, other: &Self) -> bool {
+        self.condition() == other.condition() && 
+        self.then_branch() == other.then_branch() &&
+        self.else_branch() == other.else_branch()
+    }
+}
+
+#[inline]
+pub fn make_if(cond: Expr, thenbr: Stmt, elsebr: Option<Stmt>) -> Stmt {
+    let mut elopt: Option<Box<Stmt>> = None;
+    if let Some(elsebr_val) = elsebr {
+        elopt = Some(Box::new(elsebr_val));
+    }
+    Stmt::If(IfData::new(Box::new(cond), Box::new(thenbr), elopt))
+}
+
 #[derive(Debug)]
 pub struct PrintData {
     expr: Box<Expr>,
@@ -390,6 +570,17 @@ impl PrintData {
     pub fn expr(&self) -> &Expr {
         &self.expr
     }
+}
+
+impl PartialEq for PrintData {
+    fn eq(&self, other: &Self) -> bool {
+        self.expr() == other.expr()
+    }
+}
+
+#[inline]
+pub fn make_print(expr: Expr) -> Stmt {
+    Stmt::Print(PrintData::new(Box::new(expr)))
 }
 
 #[derive(Debug)]
@@ -412,6 +603,18 @@ impl ReturnData {
     }
 }
 
+impl PartialEq for ReturnData {
+    fn eq(&self, other: &Self) -> bool {
+        self.keyword() == other.keyword() &&
+        self.value() == other.value()
+    }
+}
+
+#[inline]
+pub fn make_return(keyword: &str, value: Expr) -> Stmt {
+    Stmt::Return(ReturnData::new(String::from(keyword), Box::new(value)))
+}
+
 #[derive(Debug)]
 pub struct VarDeclData {
     name: String,
@@ -427,6 +630,10 @@ impl VarDeclData {
         &self.name
     }
 
+    pub fn has_initializer(&self) -> bool {
+        !self.initializer().is_none()
+    }
+
     pub fn initializer(&self) -> Option<&Expr> {
         match &self.initializer {
            Some(expr) => Some(&expr),
@@ -435,14 +642,30 @@ impl VarDeclData {
     }
 }
 
+impl PartialEq for VarDeclData {
+    fn eq(&self, other: &Self) -> bool {
+        self.name() == other.name() &&
+        self.initializer() == other.initializer()
+    }
+}
+
+#[inline]
+pub fn make_vardecl(name: &str, init: Option<Expr>) -> Stmt {
+    let mut initop: Option<Box<Expr>> = None;
+    if let Some(init_val) = init {
+        initop = Some(Box::new(init_val));
+    }
+    Stmt::VarDecl(VarDeclData::new(String::from(name), initop))
+}
+
 #[derive(Debug)]
 pub struct WhileData {
     condition: Box<Expr>, 
-    body: Box<Stmt>,
+    body: Vec<Stmt>,
 }
 
 impl WhileData {
-    pub fn new(cond: Box<Expr>, body: Box<Stmt>) -> Self {
+    pub fn new(cond: Box<Expr>, body: Vec<Stmt>) -> Self {
         Self {condition: cond, body: body}
     }
 
@@ -450,12 +673,25 @@ impl WhileData {
         &self.condition
     }
 
-    pub fn body(&self) -> &Stmt {
+    pub fn body(&self) -> &[Stmt] {
         &self.body
     }
 }
 
-#[derive(Debug)]
+impl PartialEq for WhileData {
+    fn eq(&self, other: &Self) -> bool {
+        if self.condition() != other.condition() {
+            return false;
+        }
+        cmp_seq(self.body(), other.body())
+    }
+}
+
+pub fn make_while(cond: Expr, body: Vec<Stmt>) -> Stmt {
+    Stmt::While(WhileData::new(Box::new(cond), body))
+}
+
+#[derive(Debug, PartialEq)]
 pub enum Stmt {
     Expr(ExprData),
     VarDecl(VarDeclData),
