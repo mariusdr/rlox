@@ -294,5 +294,36 @@ mod parser_tests {
         assert_eq!(res[0], v);
     }
 
+    fn and_expr() -> Expr {
+        make_and(make_num_literal("1"), make_num_literal("0"))
+    }
+    fn and_stmt() -> Stmt { make_expr(and_expr()) }
+    
+    fn or_expr() -> Expr {
+        make_or(make_num_literal("1"), make_num_literal("0"))
+    }
+    fn or_stmt() -> Stmt { make_expr(or_expr()) }
+
+    #[test]
+    fn logicals() {
+        let src = "1 and 0;";
+        let res = Parser::new(src).parse().unwrap();
+        assert_eq!(res[0], and_stmt());
+        
+        let src = "1 or 0;";
+        let res = Parser::new(src).parse().unwrap();
+        assert_eq!(res[0], or_stmt());
+    }
+
+    #[test]
+    fn nested_logical() {
+        let src = "1 and 1 or 1 and 0;";
+        let res = Parser::new(src).parse().unwrap();
+        let v = make_or(make_and(make_num_literal("1"), make_num_literal("1")), 
+                        make_and(make_num_literal("1"), make_num_literal("0")));
+        let v = make_expr(v);
+        assert_eq!(res[0], v);
+    }
+
 
 }

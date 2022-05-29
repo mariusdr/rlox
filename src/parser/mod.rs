@@ -51,9 +51,9 @@ impl<'a> Parser<'a> {
     }
 
     /// assignment ::= variable '=' assignment 
-    ///            ::= equality
+    ///            ::= or
     pub fn assignment(&mut self) -> Result<Expr, ParserError> {
-        let expr = self.equality()?;
+        let expr = self.or()?;
 
         if self.try_consume(TokenType::Equal) {
             let value = self.assignment()?;
@@ -63,6 +63,26 @@ impl<'a> Parser<'a> {
             return self.assignment_error(&expr);
         }
         Ok(expr)
+    }
+
+    /// and ::= equality ( 'and' equality )*
+    fn and(&mut self) -> Result<Expr, ParserError> {
+        let mut lhs = self.equality()?;
+        while self.try_consume(TokenType::And) {
+            let rhs = self.equality()?;
+            lhs = make_and(lhs, rhs);
+        }
+        Ok(lhs)
+    }
+
+    /// or ::= and ( 'or' and )*
+    fn or(&mut self) -> Result<Expr, ParserError> {
+        let mut lhs = self.and()?;
+        while self.try_consume(TokenType::Or) {
+            let rhs = self.and()?;
+            lhs = make_or(lhs, rhs);
+        }
+        Ok(lhs)
     }
 
     /// equality ::= comparison ('!=' | '==') comparison | comparison

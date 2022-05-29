@@ -42,6 +42,8 @@ pub enum BinaryOpType {
     Sub,
     Mult,
     Div,
+    And,
+    Or,
 }
 
 impl BinaryOpType {
@@ -57,6 +59,8 @@ impl BinaryOpType {
             TokenType::Minus => Some(BinaryOpType::Sub),
             TokenType::Star => Some(BinaryOpType::Mult),
             TokenType::Slash => Some(BinaryOpType::Div),
+            TokenType::And => Some(BinaryOpType::And),
+            TokenType::Or => Some(BinaryOpType::Or),
             _ => None
         }
     }
@@ -75,7 +79,9 @@ impl fmt::Display for BinaryOpType {
             BinaryOpType::Sub => write!(f, "-"),
             BinaryOpType::Mult => write!(f, "*"),
             BinaryOpType::Div => write!(f, "/"),
-        }                 
+            BinaryOpType::And => write!(f, "and"),
+            BinaryOpType::Or => write!(f, "or"),
+        }
     }                     
 }                         
 
@@ -328,6 +334,54 @@ pub fn make_assign(name: &str, expr: Expr) -> Expr {
     Expr::Assign(AssignData::new(String::from(name), Box::new(expr)))
 }
 
+#[derive(Debug)]
+pub struct LogicalData {
+    op: BinaryOpType,
+    lhs: Box<Expr>,
+    rhs: Box<Expr>,
+}
+
+impl LogicalData {
+    pub fn new(op: BinaryOpType, lhs: Box<Expr>, rhs: Box<Expr>) -> Self {
+        Self {op: op, lhs: lhs, rhs: rhs}
+    }
+
+    pub fn op_type(&self) -> BinaryOpType {
+        self.op
+    }
+    
+    pub fn lhs(&self) -> &Expr {
+        &self.lhs
+    }
+    
+    pub fn rhs(&self) -> &Expr {
+        &self.rhs
+    }
+}
+
+impl PartialEq for LogicalData {
+    fn eq(&self, other: &Self) -> bool {
+        self.op_type() == other.op_type() 
+        && self.lhs() == other.lhs()
+        && self.rhs() == other.rhs()
+    }
+}
+
+#[inline]
+pub fn make_logical(op: BinaryOpType, lhs: Expr, rhs: Expr) -> Expr {
+    Expr::BinaryOp(BinaryOpData::new(op, Box::new(lhs), Box::new(rhs)))
+}
+
+#[inline]
+pub fn make_and(lhs: Expr, rhs: Expr) -> Expr {
+    make_logical(BinaryOpType::And, lhs, rhs)
+}
+
+#[inline]
+pub fn make_or(lhs: Expr, rhs: Expr) -> Expr {
+    make_logical(BinaryOpType::Or, lhs, rhs)
+}
+
 #[derive(Debug, PartialEq)]
 pub enum Expr {
     Literal(LiteralData),
@@ -336,6 +390,7 @@ pub enum Expr {
     BinaryOp(BinaryOpData),
     Variable(VariableData),
     Assign(AssignData),
+    Logical(LogicalData),
 }
 
 impl fmt::Display for Expr {
@@ -346,7 +401,8 @@ impl fmt::Display for Expr {
             Expr::UnaryOp(od) => write!(f, "({} {})", od.op_type(), od.expr()),
             Expr::BinaryOp(od) => write!(f, "({} {} {})", od.op_type(), od.lhs(), od.rhs()),
             Expr::Variable(vd) => write!(f, "{}", vd.name()),
-            Expr::Assign(ad) => write!(f, "(assign {} {})", ad.name(), ad.expr())
+            Expr::Assign(ad) => write!(f, "(assign {} {})", ad.name(), ad.expr()),
+            Expr::Logical(ld) => write!(f, "({} {} {})", ld.op_type(), ld.lhs(), ld.rhs()),
         }
     }
 }
@@ -359,6 +415,7 @@ pub fn expr_type(expr: &Expr) -> String {
         Expr::BinaryOp(_) => String::from("BinaryOp"),
         Expr::Variable(_) => String::from("Variable"),
         Expr::Assign(_) => String::from("Assign"),
+        Expr::Logical(_) => String::from("Logical"),
     };
     typestr 
 }
