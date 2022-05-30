@@ -1,6 +1,9 @@
 #![allow(dead_code)]
 pub mod ast;
+pub mod optypes;
+mod display;
 mod tests;
+mod loxtypes;
 
 use std::result::Result;
 use std::iter::Peekable;
@@ -8,6 +11,7 @@ use std::fmt::{Write};
 use std::f64;
 
 use ast::*;
+use optypes::*;
 use super::lexer::TokenStream;
 use super::lexer::token::{Token, TokenType};
 
