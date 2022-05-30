@@ -229,6 +229,13 @@ mod parser_tests {
         let res = Parser::new(src).parse().unwrap();
         assert_eq!(res[0], varassign_stmt());
     }
+    
+    #[test]
+    fn varassign_missing_semicolon() {
+        let src = "x = (1+2) - ((1-2) + (1*2))";
+        let res = Parser::new(src).parse();
+        assert!(res.is_err());
+    }
 
     #[test]
     fn vardecl_without_init() {
@@ -236,6 +243,13 @@ mod parser_tests {
         let res = Parser::new(src).parse().unwrap();
         let vd = make_vardecl("x", None);
         assert_eq!(res[0], vd);
+    }
+    
+    #[test]
+    fn vardecl_missing_semicolon() {
+        let src = "var x";
+        let res = Parser::new(src).parse();
+        assert!(res.is_err());
     }
 
     #[test]
@@ -330,6 +344,59 @@ mod parser_tests {
         let src = "while (1 and 0) 1+2;";
         let res = Parser::new(src).parse().unwrap();
         let v = make_while(and_expr(), sum_stmt());
+        assert_eq!(res[0], v);
+    }
+
+    fn init_stmt() -> Stmt {
+        make_vardecl("i", Some(make_num_literal("1")))
+    }
+
+    fn cond_expr() -> Expr {
+        make_binaryop(BinaryOpType::Less, 
+            make_variable("i"), 
+            make_num_literal("10"))
+    }
+    
+    fn incr_expr() -> Expr {
+        make_assign("i", make_binaryop(BinaryOpType::Add, make_variable("i"), make_num_literal("1")))
+    }
+
+    fn for_stmt() -> Stmt {
+        let b = make_print(make_variable("i"));
+        make_for(Some(init_stmt()), Some(cond_expr()), Some(incr_expr()), b)
+    }
+
+    #[test]
+    fn for_statement() {
+        let src = "for (var i = 1; i < 10; i = i + 1) print i;";
+        let res = Parser::new(src).parse().unwrap();
+        assert_eq!(res[0], for_stmt());
+    }
+
+    #[test]
+    fn for_statement_no_decl() {
+        let src = "for (; i < 10; i = i + 1) print i;";
+        let b = make_print(make_variable("i"));
+        let v = make_for(None, Some(cond_expr()), Some(incr_expr()), b);
+        let res = Parser::new(src).parse().unwrap();
+        assert_eq!(res[0], v);
+    }
+    
+    #[test]
+    fn for_statement_no_decl_no_cond() {
+        let src = "for (; ; i = i + 1) print i;";
+        let b = make_print(make_variable("i"));
+        let v = make_for(None, None, Some(incr_expr()), b);
+        let res = Parser::new(src).parse().unwrap();
+        assert_eq!(res[0], v);
+    }
+
+    #[test]
+    fn for_statement_no_decl_no_cond_no_incr() {
+        let src = "for (;;) print i;";
+        let b = make_print(make_variable("i"));
+        let v = make_for(None, None, None, b);
+        let res = Parser::new(src).parse().unwrap();
         assert_eq!(res[0], v);
     }
 }

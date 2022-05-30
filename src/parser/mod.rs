@@ -214,6 +214,7 @@ impl<'a> Parser<'a> {
     ///           ::= exrpstmt
     ///           ::= '{' blockstmt
     ///           ::= 'if' ifstmt
+    ///           ::= 'for' forstmt
     pub fn statement(&mut self) -> Result<Stmt, ParserError> {
         if self.try_consume(TokenType::Print) {
             return self.print_statement();
@@ -226,6 +227,9 @@ impl<'a> Parser<'a> {
         }
         if self.try_consume(TokenType::While) {
             return self.while_statement();
+        }
+        if self.try_consume(TokenType::For) {
+            return self.for_statement();
         }
         self.expr_statement()
     }
@@ -281,7 +285,7 @@ impl<'a> Parser<'a> {
         }        
         Ok(make_if(cond, then_br, else_br))
     }
-    
+
     /// whilestmt ::= 'while' '(' expression ')' statement
     fn while_statement(&mut self) -> Result<Stmt, ParserError> {
         self.require(TokenType::LeftParen, "Expect '(' after 'while'.")?;
@@ -290,6 +294,39 @@ impl<'a> Parser<'a> {
 
         let body = self.statement()?;
         Ok(make_while(cond, body))
+    }
+
+    /// forstmt ::= 'for' '(' (vardecl | exprstmt | ';') expression? ';' expression? ')' statement
+    fn for_statement(&mut self) -> Result<Stmt, ParserError> {
+        self.require(TokenType::LeftParen, "Expect '(' after 'for'.")?;
+
+        let init: Option<Stmt>;
+        if self.try_consume(TokenType::Semicolon) {
+            init = None;
+        } else if self.try_consume(TokenType::Var) {
+            init = Some(self.var_declaration()?);
+        } else {
+            init = Some(self.expr_statement()?);
+        }
+
+        let cond: Option<Expr>;
+        if self.try_consume(TokenType::Semicolon) {
+            cond = None;
+        } else {
+            cond = Some(self.expression()?);
+            self.require(TokenType::Semicolon, "Expect ';' after loop condition.")?;
+        }
+
+        let incr: Option<Expr>;
+        if self.try_consume(TokenType::RightParen) {
+            incr = None;
+        } else {
+            incr = Some(self.expression()?);
+            self.require(TokenType::RightParen, "Expect ')' after for clause")?;
+        }
+ 
+        let body = self.statement()?;
+        Ok(make_for(init, cond, incr, body))
     }
 
     pub fn parse(&mut self) -> Result<Stmts, ParserError> {

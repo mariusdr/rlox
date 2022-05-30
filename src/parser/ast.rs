@@ -748,6 +748,71 @@ pub fn make_while(cond: Expr, body: Stmt) -> Stmt {
     Stmt::While(WhileData::new(Box::new(cond), Box::new(body)))
 }
 
+#[derive(Debug)]
+pub struct ForData {
+    init: Option<Box<Stmt>>,
+    cond: Option<Box<Expr>>,
+    incr: Option<Box<Expr>>,
+    body: Box<Stmt>,
+}
+
+impl ForData {
+    pub fn new(init: Option<Box<Stmt>>, cond: Option<Box<Expr>>, incr: Option<Box<Expr>>, body: Box<Stmt>) -> Self {
+        Self { init: init, cond: cond, incr: incr, body: body }
+    }
+
+    pub fn initializer(&self) -> Option<&Stmt> {
+        match &self.init {
+            Some(d) => Some(&d),
+            None => None,
+        }
+    }
+    
+    pub fn condition(&self) -> Option<&Expr> {
+        match &self.cond {
+            Some(e) => Some(&e),
+            None => None,
+        }
+    }
+    
+    pub fn incrementor(&self) -> Option<&Expr> {
+        match &self.incr {
+            Some(e) => Some(&e),
+            None => None,
+        }
+    }
+
+    pub fn body(&self) -> &Stmt {
+        &self.body
+    }
+}
+
+impl PartialEq for ForData {
+    fn eq(&self, other: &Self) -> bool {
+        self.initializer() == other.initializer() &&
+        self.condition() == other.condition() &&
+        self.incrementor() == other.incrementor() &&
+        self.body() == other.body()
+    }
+}
+
+#[inline]
+pub fn make_for(init: Option<Stmt>, cond: Option<Expr>, incr: Option<Expr>, body: Stmt) -> Stmt {
+    let mut declop: Option<Box<Stmt>> = None;
+    if let Some(d) = init {
+        declop = Some(Box::new(d));
+    }
+    let mut condop: Option<Box<Expr>> = None;
+    if let Some(c) = cond {
+        condop = Some(Box::new(c));
+    }
+    let mut incrop: Option<Box<Expr>> = None;
+    if let Some(i) = incr {
+        incrop = Some(Box::new(i));
+    }
+    Stmt::For(ForData::new(declop, condop, incrop, Box::new(body)))
+}
+
 #[derive(Debug, PartialEq)]
 pub enum Stmt {
     Expr(ExprData),
@@ -758,6 +823,7 @@ pub enum Stmt {
     Return(ReturnData),
     If(IfData),
     While(WhileData),
+    For(ForData),
     Print(PrintData),
 }
 
@@ -807,6 +873,32 @@ impl fmt::Display for IfData {
     }
 }
 
+impl fmt::Display for WhileData {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Stmt::While: -- start --\n");
+        write!(f, "-- condition --\n{}\n", self.condition());
+        write!(f, "-- body --\n{}\n", self.body());
+        write!(f, "Stmt::While: -- end --")
+    }
+}
+
+impl fmt::Display for ForData {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Stmt::While: -- start --\n");
+        if let Some(i) = self.initializer() {
+            write!(f, "-- initializer --\n{}\n", i);
+        }
+        if let Some(c) = self.condition() {
+            write!(f, "-- condition --\n{}\n", c);
+        }
+        if let Some(r) = self.incrementor() {
+            write!(f, "-- increment --\n{}\n", r);
+        }
+        write!(f, "-- body --\n{}\n", self.body());
+        write!(f, "Stmt::While: -- end --")
+    }
+}
+
 impl fmt::Display for Stmt {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -815,6 +907,8 @@ impl fmt::Display for Stmt {
             Stmt::VarDecl(vd) => write!(f, "{}", vd),
             Stmt::Block(bd) => write!(f, "{}", bd),
             Stmt::If(id) => write!(f, "{}", id),
+            Stmt::While(wd) => write!(f, "{}", wd),
+            Stmt::For(fd) => write!(f, "{}", fd),
             _ => write!(f, "...."),
         }
     }
