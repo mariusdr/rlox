@@ -452,4 +452,49 @@ mod parser_tests {
         assert_eq!(res[0], fc);
     }
 
+    #[test]
+    fn function_decl() {
+        let src = "fun foo(x, y) { x + y; }";
+        let res = Parser::new(src).parse().unwrap();
+
+        let vx = make_variable("x");
+        let vy = make_variable("y");
+        let xpy = make_expr(make_binaryop(BinaryOpType::Add, vx, vy));
+        let xpy = make_block(vec![xpy]);
+        let fd = make_function("foo", vec![String::from("x"), String::from("y")], xpy);
+
+        assert_eq!(res[0], fd);
+    }
+
+    #[test]
+    fn function_decl_no_params() {
+        let src = "fun foo() { x + y; }";
+        let res = Parser::new(src).parse().unwrap();
+
+        let vx = make_variable("x");
+        let vy = make_variable("y");
+        let xpy = make_expr(make_binaryop(BinaryOpType::Add, vx, vy));
+        let xpy = make_block(vec![xpy]);
+        let fd = make_function("foo", vec![], xpy);
+
+        assert_eq!(res[0], fd);
+    }
+
+    #[test]
+    fn function_decl_in_function_decl() {
+        let src = "fun foo() { fun bar(x,y) {x+y;} }";
+        let res = Parser::new(src).parse().unwrap();
+
+        let vx = make_variable("x");
+        let vy = make_variable("y");
+        let xpy = make_expr(make_binaryop(BinaryOpType::Add, vx, vy));
+        let xpy = make_block(vec![xpy]);
+        let ifd = make_function("bar", vec![String::from("x"), String::from("y")], xpy);
+
+        let ib = make_block(vec![ifd]);
+        let fd = make_function("foo", vec![], ib);
+
+        assert_eq!(res[0], fd);
+    }
+
 }

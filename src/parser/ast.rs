@@ -425,11 +425,11 @@ pub fn make_expr(expr: Expr) -> Stmt {
 pub struct FunctionData {
     name: String,
     params: Vec<String>,
-    body: Vec<Stmt>,
+    body: Box<Stmt>,
 }
 
 impl FunctionData {
-    pub fn new(name: String, params: Vec<String>, body: Vec<Stmt>) -> Self {
+    pub fn new(name: String, params: Vec<String>, body: Box<Stmt>) -> Self {
         Self {name: name, params: params, body: body}
     }
 
@@ -441,7 +441,7 @@ impl FunctionData {
         &self.params
     }
 
-    pub fn body(&self) -> &[Stmt] {
+    pub fn body(&self) -> &Stmt {
         &self.body
     }
 }
@@ -454,13 +454,13 @@ impl PartialEq for FunctionData {
         if !cmp_seq(self.params(), other.params()) {
             return false;
         }
-        cmp_seq(self.body(), other.body())
+        self.body() == other.body()
     }
 }
 
 #[inline]
-pub fn make_function(name: &str, params: Vec<String>, body: Vec<Stmt>) -> Stmt {
-    Stmt::Function(FunctionData::new(String::from(name), params, body))
+pub fn make_function(name: &str, params: Vec<String>, body: Stmt) -> Stmt {
+    Stmt::Function(FunctionData::new(String::from(name), params, Box::new(body)))
 }
 
 #[derive(Debug)]

@@ -287,9 +287,39 @@ impl<'a> Parser<'a> {
         Ok(make_vardecl(name, initializer))
     }
 
+    /// fundecl ::= 'fun' IDENTIFIER '(' parameters? ')' block
+    /// parameters ::= IDENTIFIER ( ',' IDENTIFIER )* 
+    fn function(&mut self) -> Result<Stmt, ParserError> {
+        self.require(TokenType::Identifier, "Expect function name.")?;
+        let name = self.previous.get_lexeme();
+        
+        self.require(TokenType::LeftParen, "Expect '(' after function name.")?;
+        let mut params: Vec<String> = Vec::new();
+        
+        while !self.try_consume(TokenType::RightParen) {
+            if params.len() >= 1 {
+                self.require(TokenType::Comma, "Expect ',' after parameter.")?;
+            }
+            if params.len() >= 255 {
+                return Err(ParserError::from("Function cannot have more than 255 parameters."));
+            }
+
+            self.require(TokenType::Identifier, "Expect parameter name")?;
+            params.push(self.previous.get_lexeme());  
+        }
+
+        self.require(TokenType::LeftBrace, "Expect '{' before function body.")?;
+        let body = self.block_statement()?;
+
+        Ok(make_function(&name, params, body))
+    }
+
     /// declstmt ::= 'var' vardeclstmt
     ///          ::= statement
     pub fn declaration(&mut self) -> Result<Stmt, ParserError> {
+        if self.try_consume(TokenType::Fun) {
+            return self.function();
+        }
         if self.try_consume(TokenType::Var) {
             return self.var_declaration();
         }
