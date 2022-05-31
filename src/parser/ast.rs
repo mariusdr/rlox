@@ -14,6 +14,7 @@ pub enum Expr {
     Variable(VariableData),
     Assign(AssignData),
     Logical(LogicalData),
+    Call(CallData),
 }
 
 #[derive(Debug, PartialEq)]
@@ -307,6 +308,40 @@ pub fn make_or(lhs: Expr, rhs: Expr) -> Expr {
     make_logical(BinaryOpType::Or, lhs, rhs)
 }
 
+#[derive(Debug)]
+pub struct CallData {
+    callee: Box<Expr>,
+    args: Vec<Expr>,
+}
+
+impl CallData {
+    pub fn new(callee: Box<Expr>, args: Vec<Expr>) -> Self {
+        Self { callee: callee, args: args }
+    }
+
+    pub fn callee(&self) -> &Expr {
+        &self.callee
+    } 
+
+    pub fn args(&self) -> &[Expr] {
+        &self.args
+    }
+}
+
+impl PartialEq for CallData {
+    fn eq(&self, other: &Self) -> bool {
+        if self.callee() != other.callee() {
+            return false;
+        }
+        cmp_seq(self.args(), other.args()) 
+    }
+}
+
+#[inline]
+pub fn make_call(callee: Expr, args: Vec<Expr>) -> Expr {
+    Expr::Call(CallData::new(Box::new(callee), args))
+}
+
 pub fn expr_type(expr: &Expr) -> String {
     let typestr = match expr {
         Expr::Literal(_) => String::from("Literal"),
@@ -316,6 +351,7 @@ pub fn expr_type(expr: &Expr) -> String {
         Expr::Variable(_) => String::from("Variable"),
         Expr::Assign(_) => String::from("Assign"),
         Expr::Logical(_) => String::from("Logical"),
+        Expr::Call(_) => String::from("Call"),
     };
     typestr 
 }

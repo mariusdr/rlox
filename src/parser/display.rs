@@ -11,6 +11,7 @@ impl fmt::Display for Expr {
             Expr::Variable(vd) => write!(f, "{}", vd.name()),
             Expr::Assign(ad) => write!(f, "(assign {} {})", ad.name(), ad.expr()),
             Expr::Logical(ld) => write!(f, "({} {} {})", ld.op_type(), ld.lhs(), ld.rhs()),
+            Expr::Call(cd) => write!(f, "({}({:?})", cd.callee(), cd.args()),
         }
     }
 }

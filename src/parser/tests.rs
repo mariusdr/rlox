@@ -399,4 +399,57 @@ mod parser_tests {
         let res = Parser::new(src).parse().unwrap();
         assert_eq!(res[0], v);
     }
+
+    #[test]
+    fn function_call() {
+        let src = "foo(bar, 3*baz, 1 and 1, \"a string literal\");";
+        let res = Parser::new(src).parse().unwrap();
+
+        let v1 = make_variable("bar");
+        let v2 = make_binaryop(BinaryOpType::Mult, make_num_literal("3"), make_variable("baz"));
+        let v3 = make_logical(BinaryOpType::And, make_num_literal("1"), make_num_literal("1"));
+        let v4 = make_str_literal("a string literal");
+        let fc = make_call(make_variable("foo"), vec![v1, v2, v3, v4]);
+        let fc = make_expr(fc);
+        
+        assert_eq!(res[0], fc);
+    }
+
+    #[test]
+    fn function_call_no_args() {
+        let src = "foo();";
+        let res = Parser::new(src).parse().unwrap();
+
+        let fc = make_call(make_variable("foo"), vec![]);
+        let fc = make_expr(fc);
+        
+        assert_eq!(res[0], fc);
+    }
+    
+    #[test]
+    fn function_call_from_closure_no_args() {
+        let src = "foo()()();";
+        let res = Parser::new(src).parse().unwrap();
+
+        let fc = make_call(make_variable("foo"), vec![]);
+        let fc = make_call(fc, vec![]);
+        let fc = make_call(fc, vec![]);
+        let fc = make_expr(fc);
+        
+        assert_eq!(res[0], fc);
+    }
+    
+    #[test]
+    fn function_call_currying() {
+        let src = "foo(x)(y)(z);";
+        let res = Parser::new(src).parse().unwrap();
+
+        let fc = make_call(make_variable("foo"), vec![make_variable("x")]);
+        let fc = make_call(fc, vec![make_variable("y")]);
+        let fc = make_call(fc, vec![make_variable("z")]);
+        let fc = make_expr(fc);
+        
+        assert_eq!(res[0], fc);
+    }
+
 }

@@ -146,6 +146,35 @@ impl<'a> Parser<'a> {
         }
         Ok(lhs)
     }
+    
+    /// arguments ::= expression ( ',' expression )*
+    fn finish_call(&mut self, callee: Expr) -> Result<Expr, ParserError> {
+        let mut args: Vec<Expr> = vec![];
+        while !self.try_consume(TokenType::RightParen) {
+            if args.len() >= 1 {
+                self.require(TokenType::Comma, "Expect ',' between function arguments.")?;
+            }
+            if args.len() >= 255 {
+                let err = ParserError::from("Function cannot have more than 255 arguments.");
+                return Err(err);
+            }
+            args.push(self.expression()?);
+        }
+        Ok(make_call(callee, args))
+    }
+
+    /// callexpr ::= primary ( '(' arguments? ')' )*
+    fn call(&mut self) -> Result<Expr, ParserError> {
+        let mut expr = self.primary()?;
+        loop {
+            if self.try_consume(TokenType::LeftParen) {
+                expr = self.finish_call(expr)?;
+            } else {
+                break;
+            }
+        }
+        Ok(expr)
+    }
 
     /// retrieve unary op type of previous token.
     fn unaryop_type(&mut self) -> Result<UnaryOpType, ParserError> {
@@ -156,14 +185,14 @@ impl<'a> Parser<'a> {
     }
 
     /// unary ::= '-' unary | '!' unary
-    ///       ::= primary
+    ///       ::= callexpr
     pub fn unary(&mut self) -> Result<Expr, ParserError> {
         if self.try_consume(TokenType::Bang) | self.try_consume(TokenType::Minus) {
             let op = self.unaryop_type()?;
             let rhs = self.unary()?;
             return Ok(make_unaryop(op, rhs));
         }
-        self.primary()
+        self.call()
     }
 
     /// primary ::= NUMBER | STRING | "true" | "false" | "nil" 
@@ -197,7 +226,9 @@ impl<'a> Parser<'a> {
             return Ok(make_grouping(expr));
         }
 
-        Err(ParserError::from("TokenStream ended unexpectedly while parsing primary expression."))
+        let mut errmsg = String::new();
+        write!(&mut errmsg, "TokenStream ended unexpextedly on Token '{}' while parsing primary expr.", self.previous);
+        Err(ParserError::new(errmsg))
     }
 
     /// printstmt ::= 'print' expression ';'
@@ -378,7 +409,7 @@ impl<'a> Parser<'a> {
         }
         Ok(())
     }
-
+    
     #[inline]
     fn is_done(&mut self) -> bool {
         self.peek_at_next_token(TokenType::Eof)
